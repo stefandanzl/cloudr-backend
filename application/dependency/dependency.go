@@ -18,6 +18,7 @@ import (
 	"github.com/cloudreve/Cloudreve/v4/pkg/credmanager"
 	"github.com/cloudreve/Cloudreve/v4/pkg/email"
 	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/encrypt"
+	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/eventhub"
 	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/fs/mime"
 	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/lock"
 	"github.com/cloudreve/Cloudreve/v4/pkg/hashid"
@@ -25,6 +26,9 @@ import (
 	"github.com/cloudreve/Cloudreve/v4/pkg/mediameta"
 	"github.com/cloudreve/Cloudreve/v4/pkg/queue"
 	"github.com/cloudreve/Cloudreve/v4/pkg/request"
+	"github.com/cloudreve/Cloudreve/v4/pkg/searcher"
+	"github.com/cloudreve/Cloudreve/v4/pkg/searcher/extractor"
+	"github.com/cloudreve/Cloudreve/v4/pkg/searcher/indexer"
 	"github.com/cloudreve/Cloudreve/v4/pkg/setting"
 	"github.com/cloudreve/Cloudreve/v4/pkg/thumb"
 	"github.com/cloudreve/Cloudreve/v4/pkg/util"
@@ -86,6 +90,8 @@ type Dep interface {
 	DavAccountClient() inventory.DavAccountClient
 	// DirectLinkClient Creates a new inventory.DirectLinkClient instance for access DB direct link store.
 	DirectLinkClient() inventory.DirectLinkClient
+	// OAuthClientClient Creates a new inventory.OAuthClientClient instance for access DB OAuth client store.
+	OAuthClientClient() inventory.OAuthClientClient
 	// HashIDEncoder Get a singleton hashid.Encoder instance for encoding/decoding hashids.
 	HashIDEncoder() hashid.Encoder
 	// TokenAuth Get a singleton auth.TokenAuth instance for token authentication.
@@ -134,6 +140,12 @@ type Dep interface {
 	MasterEncryptKeyVault(ctx context.Context) encrypt.MasterEncryptKeyVault
 	// EncryptorFactory Get a new encrypt.CryptorFactory instance.
 	EncryptorFactory(ctx context.Context) encrypt.CryptorFactory
+	// EventHub Get a singleton eventhub.EventHub instance for event publishing.
+	EventHub() eventhub.EventHub
+	// SearchIndexer Get a singleton searcher.SearchIndexer instance for full-text search indexing.
+	SearchIndexer(ctx context.Context) searcher.SearchIndexer
+	// TextExtractor Get a singleton searcher.TextExtractor instance for text extraction.
+	TextExtractor(ctx context.Context) searcher.TextExtractor
 }
 
 type dependency struct {
@@ -156,6 +168,8 @@ type dependency struct {
 	nodeClient            inventory.NodeClient
 	davAccountClient      inventory.DavAccountClient
 	directLinkClient      inventory.DirectLinkClient
+	fsEventClient         inventory.FsEventClient
+	oAuthClient           inventory.OAuthClientClient
 	emailClient           email.Driver
 	generalAuth           auth.Auth
 	hashidEncoder         hashid.Encoder
@@ -179,6 +193,9 @@ type dependency struct {
 	parser                *uaparser.Parser
 	cron                  *cron.Cron
 	masterEncryptKeyVault encrypt.MasterEncryptKeyVault
+	eventHub              eventhub.EventHub
+	searchIndexer         searcher.SearchIndexer
+	textExtractor         searcher.TextExtractor
 
 	configPath        string
 	isPro             bool
@@ -364,6 +381,78 @@ func (d *dependency) NavigatorStateKV() cache.Driver {
 	return d.navigatorStateKv
 }
 
+func (d *dependency) EventHub() eventhub.EventHub {
+	if d.eventHub != nil {
+		return d.eventHub
+	}
+	d.eventHub = eventhub.NewEventHub(d.UserClient(), d.FsEventClient(), d.SettingProvider())
+	return d.eventHub
+}
+
+func (d *dependency) SearchIndexer(ctx context.Context) searcher.SearchIndexer {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	_, reload := ctx.Value(ReloadCtx{}).(bool)
+	if d.searchIndexer != nil && !reload {
+		return d.searchIndexer
+	}
+
+	sp := d.SettingProvider()
+	if !sp.FTSEnabled(ctx) || sp.FTSIndexType(ctx) != setting.FTSIndexTypeMeilisearch {
+		d.searchIndexer = &indexer.NoopIndexer{}
+		return d.searchIndexer
+	}
+
+	msCfg := sp.FTSIndexMeilisearch(ctx)
+	if msCfg.Endpoint == "" {
+		d.searchIndexer = &indexer.NoopIndexer{}
+		return d.searchIndexer
+	}
+
+	idx := indexer.NewMeilisearchIndexer(msCfg, sp.FTSChunkSize(ctx), d.Logger())
+	if err := idx.EnsureIndex(ctx); err != nil {
+		d.Logger().Warning("Failed to ensure Meilisearch index: %s, falling back to noop", err)
+		d.searchIndexer = &indexer.NoopIndexer{}
+		return d.searchIndexer
+	}
+
+	d.searchIndexer = idx
+	return d.searchIndexer
+}
+
+func (d *dependency) TextExtractor(ctx context.Context) searcher.TextExtractor {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	_, reload := ctx.Value(ReloadCtx{}).(bool)
+	if d.textExtractor != nil && !reload {
+		return d.textExtractor
+	}
+
+	sp := d.SettingProvider()
+	if sp.FTSExtractorType(ctx) != setting.FTSExtractorTypeTika {
+		d.textExtractor = &extractor.NoopExtractor{}
+		return d.textExtractor
+	}
+
+	tikaCfg := sp.FTSTikaExtractor(ctx)
+	if tikaCfg.Endpoint == "" {
+		d.textExtractor = &extractor.NoopExtractor{}
+		return d.textExtractor
+	}
+
+	d.textExtractor = extractor.NewTikaExtractor(d.RequestClient(), d.SettingProvider(), d.Logger(), tikaCfg)
+	return d.textExtractor
+}
+
+func (d *dependency) FsEventClient() inventory.FsEventClient {
+	if d.fsEventClient != nil {
+		return d.fsEventClient
+	}
+	return inventory.NewFsEventClient(d.DBClient(), d.ConfigProvider().Database().Type)
+}
+
 func (d *dependency) SettingClient() inventory.SettingClient {
 	if d.settingClient != nil {
 		return d.settingClient
@@ -463,6 +552,14 @@ func (d *dependency) EmailClient(ctx context.Context) email.Driver {
 	return d.emailClient
 }
 
+func (d *dependency) OAuthClientClient() inventory.OAuthClientClient {
+	if d.oAuthClient != nil {
+		return d.oAuthClient
+	}
+
+	return inventory.NewOAuthClientClient(d.DBClient(), d.ConfigProvider().Database().Type)
+}
+
 func (d *dependency) MimeDetector(ctx context.Context) mime.MimeDetector {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -547,7 +644,14 @@ func (d *dependency) MediaMetaQueue(ctx context.Context) queue.Queue {
 		queue.WithWorkerCount(queueSetting.WorkerNum),
 		queue.WithName("MediaMetadataQueue"),
 		queue.WithMaxTaskExecution(queueSetting.MaxExecution),
-		queue.WithResumeTaskType(queue.MediaMetaTaskType),
+		queue.WithResumeTaskType(
+			queue.MediaMetaTaskType,
+			queue.FullTextIndexTaskType,
+			queue.FullTextDeleteTaskType,
+			queue.FullTextRebuildTaskType,
+			queue.FullTextCopyTaskType,
+			queue.FullTextChangeOwnerTaskType,
+		),
 	)
 	return d.mediaMetaQueue
 }
@@ -765,7 +869,7 @@ func (d *dependency) TokenAuth() auth.TokenAuth {
 	}
 
 	d.tokenAuth = auth.NewTokenAuth(d.HashIDEncoder(), d.SettingProvider(),
-		[]byte(d.SettingProvider().SecretKey(context.Background())), d.UserClient(), d.Logger(), d.KV())
+		[]byte(d.SettingProvider().SecretKey(context.Background())), d.UserClient(), d.Logger(), d.KV(), d.OAuthClientClient())
 	return d.tokenAuth
 }
 
@@ -859,6 +963,20 @@ func (d *dependency) Shutdown(ctx context.Context) error {
 			d.remoteDownloadQueue.Shutdown()
 			defer wg.Done()
 		}()
+	}
+
+	if d.eventHub != nil {
+		wg.Add(1)
+		go func() {
+			d.eventHub.Close()
+			defer wg.Done()
+		}()
+	}
+
+	if d.searchIndexer != nil {
+		if err := d.searchIndexer.Close(); err != nil {
+			d.Logger().Warning("Failed to close search indexer: %s", err)
+		}
 	}
 
 	d.mu.Unlock()

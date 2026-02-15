@@ -54,12 +54,14 @@ type SiteConfig struct {
 	ThumbnailHeight      int                       `json:"thumbnail_height,omitempty"`
 	CustomProps          []types.CustomProps       `json:"custom_props,omitempty"`
 	ShowEncryptionStatus bool                      `json:"show_encryption_status,omitempty"`
+	FullTextSearch       bool                      `json:"full_text_search,omitempty"`
 
 	// Thumbnail section
 	ThumbExts []string `json:"thumb_exts,omitempty"`
 
 	// App settings
-	AppPromotion bool `json:"app_promotion,omitempty"`
+	AppPromotion        bool `json:"app_promotion,omitempty"`
+	DesktopAppPromotion bool `json:"desktop_app_promotion,omitempty"`
 
 	//EmailActive          bool      `json:"emailActive"`
 	//QQLogin              bool      `json:"QQLogin"`
@@ -119,6 +121,7 @@ func (s *GetSettingService) GetSiteConfig(c *gin.Context) (*SiteConfig, error) {
 			ThumbnailHeight:      h,
 			CustomProps:          customProps,
 			ShowEncryptionStatus: showEncryptionStatus,
+			FullTextSearch:       settings.FTSEnabled(c),
 		}, nil
 	case "emojis":
 		emojis := settings.EmojiPresets(c)
@@ -128,7 +131,8 @@ func (s *GetSettingService) GetSiteConfig(c *gin.Context) (*SiteConfig, error) {
 	case "app":
 		appSetting := settings.AppSetting(c)
 		return &SiteConfig{
-			AppPromotion: appSetting.Promotion,
+			AppPromotion:        appSetting.Promotion,
+			DesktopAppPromotion: appSetting.DesktopPromotion,
 		}, nil
 	case "thumb":
 		// Return supported thumbnail extensions from enabled generators.

@@ -216,6 +216,24 @@ type (
 		MasterEncryptKeyFile(ctx context.Context) string
 		// ShowEncryptionStatus returns true if encryption status is shown.
 		ShowEncryptionStatus(ctx context.Context) bool
+		// EventHubMaxOfflineDuration returns the maximum offline duration of event hub.
+		EventHubMaxOfflineDuration(ctx context.Context) time.Duration
+		// EventHubEnabled returns true if event hub is enabled.
+		EventHubEnabled(ctx context.Context) bool
+		// EventHubDebounceDelay returns the debounce delay of event hub.
+		EventHubDebounceDelay(ctx context.Context) time.Duration
+		// FTSEnabled returns true if full-text search is enabled.
+		FTSEnabled(ctx context.Context) bool
+		// FTSIndexType returns the full-text search index type.
+		FTSIndexType(ctx context.Context) FTSIndexType
+		// FTSExtractorType returns the full-text search extractor type.
+		FTSExtractorType(ctx context.Context) FTSExtractorType
+		// FTSIndexMeilisearch returns Meilisearch index settings.
+		FTSIndexMeilisearch(ctx context.Context) *FTSIndexMeilisearchSetting
+		// FTSTikaExtractor returns Tika extractor settings.
+		FTSTikaExtractor(ctx context.Context) *FTSTikaExtractorSetting
+		// FTSChunkSize returns the maximum chunk size in bytes for full-text search indexing.
+		FTSChunkSize(ctx context.Context) int
 	}
 	UseFirstSiteUrlCtxKey = struct{}
 )
@@ -319,7 +337,8 @@ func (s *settingProvider) FileViewers(ctx context.Context) []types.ViewerGroup {
 
 func (s *settingProvider) AppSetting(ctx context.Context) *AppSetting {
 	return &AppSetting{
-		Promotion: s.getBoolean(ctx, "show_app_promotion", false),
+		Promotion:        s.getBoolean(ctx, "show_app_promotion", false),
+		DesktopPromotion: s.getBoolean(ctx, "show_desktop_app_promotion", false),
 	}
 }
 
@@ -579,6 +598,52 @@ func (s *settingProvider) EntityUrlCacheMargin(ctx context.Context) int {
 
 func (s *settingProvider) EntityUrlValidDuration(ctx context.Context) time.Duration {
 	return time.Duration(s.getInt(ctx, "entity_url_default_ttl", 3600)) * time.Second
+}
+
+func (s *settingProvider) EventHubMaxOfflineDuration(ctx context.Context) time.Duration {
+	return time.Duration(s.getInt(ctx, "fs_event_push_max_age", 1209600)) * time.Second
+}
+
+func (s *settingProvider) EventHubDebounceDelay(ctx context.Context) time.Duration {
+	return time.Duration(s.getInt(ctx, "fs_event_push_debounce", 5)) * time.Second
+}
+
+func (s *settingProvider) EventHubEnabled(ctx context.Context) bool {
+	return s.getBoolean(ctx, "fs_event_push_enabled", true)
+}
+
+func (s *settingProvider) FTSEnabled(ctx context.Context) bool {
+	return s.getBoolean(ctx, "fts_enabled", false)
+}
+
+func (s *settingProvider) FTSIndexType(ctx context.Context) FTSIndexType {
+	return FTSIndexType(s.getString(ctx, "fts_index_type", ""))
+}
+
+func (s *settingProvider) FTSExtractorType(ctx context.Context) FTSExtractorType {
+	return FTSExtractorType(s.getString(ctx, "fts_extractor_type", ""))
+}
+
+func (s *settingProvider) FTSIndexMeilisearch(ctx context.Context) *FTSIndexMeilisearchSetting {
+	return &FTSIndexMeilisearchSetting{
+		Endpoint:         s.getString(ctx, "fts_meilisearch_endpoint", ""),
+		APIKey:           s.getString(ctx, "fts_meilisearch_api_key", ""),
+		PageSize:         s.getInt(ctx, "fts_meilisearch_page_size", 5),
+		EmbeddingEnbaled: s.getBoolean(ctx, "fts_meilisearch_embed_enabled", false),
+		EmbeddingSetting: s.getString(ctx, "fts_meilisearch_embed_config", "{}"),
+	}
+}
+
+func (s *settingProvider) FTSTikaExtractor(ctx context.Context) *FTSTikaExtractorSetting {
+	return &FTSTikaExtractorSetting{
+		Endpoint:    s.getString(ctx, "fts_tika_endpoint", ""),
+		Exts:        s.getStringList(ctx, "fts_tika_exts", []string{}),
+		MaxFileSize: s.getInt64(ctx, "fts_tika_max_file_size_remote", 52428800),
+	}
+}
+
+func (s *settingProvider) FTSChunkSize(ctx context.Context) int {
+	return s.getInt(ctx, "fts_chunk_size", 2000)
 }
 
 func (s *settingProvider) Queue(ctx context.Context, queueType QueueType) *QueueSetting {

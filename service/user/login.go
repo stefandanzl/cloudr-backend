@@ -96,7 +96,7 @@ func (service *UserResetEmailService) Reset(c *gin.Context) error {
 		return serializer.NewError(serializer.CodeUserNotActivated, "This user is not activated", nil)
 	}
 
-	secret := util.RandStringRunes(32)
+	secret := util.RandStringRunesCrypto(32)
 	if err := dep.KV().Set(fmt.Sprintf("%s%d", userResetPrefix, u.ID), secret, 3600); err != nil {
 		return serializer.NewError(serializer.CodeInternalSetting, "Failed to create reset session", err)
 	}
@@ -159,7 +159,10 @@ type (
 func IssueToken(c *gin.Context) (*BuiltinLoginResponse, error) {
 	dep := dependency.FromContext(c)
 	u := inventory.UserFromContext(c)
-	token, err := dep.TokenAuth().Issue(c, u, nil)
+	token, err := dep.TokenAuth().Issue(c, &auth.IssueTokenArgs{
+		User:        u,
+		RootTokenID: nil,
+	})
 	if err != nil {
 		return nil, serializer.NewError(serializer.CodeEncryptError, "Failed to issue token pair", err)
 	}

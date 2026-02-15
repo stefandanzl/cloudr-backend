@@ -26,6 +26,28 @@ import (
 	"github.com/samber/lo"
 )
 
+type FullTextSearchResults struct {
+	Hits  []FullTextSearchResult `json:"hits"`
+	Total int64                  `json:"total"`
+}
+
+func BuildFullTextSearchResults(ctx context.Context, user *ent.User, hasher hashid.Encoder, results *manager.FullTextSearchResults) *FullTextSearchResults {
+	return &FullTextSearchResults{
+		Hits: lo.Map(results.Hits, func(result manager.FullTextSearchResult, index int) FullTextSearchResult {
+			return FullTextSearchResult{
+				File:    *BuildFileResponse(ctx, user, result.File, hasher, nil),
+				Content: result.Content,
+			}
+		}),
+		Total: results.Total,
+	}
+}
+
+type FullTextSearchResult struct {
+	File    FileResponse `json:"file"`
+	Content string       `json:"content"`
+}
+
 type ArchiveListFilesResponse struct {
 	Files []manager.ArchivedFile `json:"files"`
 }
@@ -310,6 +332,7 @@ type Share struct {
 	Expired           bool            `json:"expired"`
 	Url               string          `json:"url"`
 	ShowReadMe        bool            `json:"show_readme,omitempty"`
+	Size              int64           `json:"size"`
 
 	// Only viewable by owner
 	IsPrivate bool   `json:"is_private,omitempty"`
@@ -345,6 +368,10 @@ func BuildShare(s *ent.Share, base *url.URL, hasher hashid.Encoder, requester *e
 		res.Expires = s.Expires
 		res.Password = s.Password
 		res.ShowReadMe = s.Props != nil && s.Props.ShowReadMe
+
+		if t == types.FileTypeFile && s.Edges.File != nil {
+			res.Size = s.Edges.File.Size
+		}
 	}
 
 	if requester.ID == owner.ID {

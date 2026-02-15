@@ -1,4 +1,4 @@
-[English Version](https://github.com/cloudreve/Cloudreve/blob/master/README.md)
+[English Version](https://github.com/cloudreve/cloudreve/blob/master/README.md)
 
 <h1 align="center">
   <br>
@@ -11,15 +11,15 @@
 <h4 align="center">支持多家云存储驱动的公有云文件系统.</h4>
 
 <p align="center">
-  <a href="https://dev.azure.com/abslantliu/Cloudreve/_build?definitionId=6">
-    <img src="https://dev.azure.com/abslantliu/Cloudreve/_apis/build/status%2Fcloudreve.Cloudreve?branchName=refs%2Fpull%2F2481%2Fmerge"
+  <a href="https://dev.azure.com/abslantliu/cloudreve/_build?definitionId=6">
+    <img src="https://img.shields.io/github/check-runs/cloudreve/cloudreve/master"
          alt="Azure pipelines">
   </a>
-  <a href="https://github.com/cloudreve/Cloudreve/releases">
-    <img src="https://img.shields.io/github/v/release/cloudreve/Cloudreve?include_prereleases" />
+  <a href="https://github.com/cloudreve/cloudreve/releases">
+    <img src="https://img.shields.io/github/v/release/cloudreve/cloudreve?include_prereleases" />
   </a>
-  <a href="https://hub.docker.com/r/cloudreve/cloudreve">
-     <img src="https://img.shields.io/docker/image-size/cloudreve/cloudreve"/>
+  <a href="https://github.com/cloudreve/cloudreve/releases">
+     <img src="https://badgen.net/static/release%20size/34%20MB/blue"/>
   </a>
   <a href="https://hub.docker.com/r/cloudreve/cloudreve">
   <img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/cloudreve/cloudreve" />
@@ -30,7 +30,7 @@
   <a href="https://demo.cloudreve.org">演示</a> •
   <a href="https://github.com/cloudreve/cloudreve/discussions">讨论</a> •
   <a href="https://docs.cloudreve.org">文档</a> •
-  <a href="https://github.com/cloudreve/Cloudreve/releases">下载</a> •
+  <a href="https://github.com/cloudreve/cloudreve/releases">下载</a> •
   <a href="https://t.me/cloudreve_official">Telegram</a> •
   <a href="https://discord.com/invite/WTpMFpZT76">Discord</a>
 </p>
@@ -50,7 +50,7 @@
 - :link: 创建文件、目录的分享链接，可设定自动过期
 - :eye_speech_bubble: 视频、图像、音频、 ePub 在线预览，文本、Office 文档在线编辑
 - :art: 自定义配色、黑暗模式、PWA 应用、全站单页应用、国际化支持
-- :rocket: All-In-One 打包，开箱即用
+- :rocket: All-in-One 打包，开箱即用
 - 🌈 ... ...
 
 ## :hammer_and_wrench: 部署

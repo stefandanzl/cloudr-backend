@@ -18,6 +18,9 @@ type Entity func(*sql.Selector)
 // File is the predicate function for file builders.
 type File func(*sql.Selector)
 
+// FsEvent is the predicate function for fsevent builders.
+type FsEvent func(*sql.Selector)
+
 // Group is the predicate function for group builders.
 type Group func(*sql.Selector)
 
@@ -26,6 +29,12 @@ type Metadata func(*sql.Selector)
 
 // Node is the predicate function for node builders.
 type Node func(*sql.Selector)
+
+// OAuthClient is the predicate function for oauthclient builders.
+type OAuthClient func(*sql.Selector)
+
+// OAuthGrant is the predicate function for oauthgrant builders.
+type OAuthGrant func(*sql.Selector)
 
 // Passkey is the predicate function for passkey builders.
 type Passkey func(*sql.Selector)

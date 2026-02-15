@@ -81,6 +81,7 @@ dockers:
     use: buildx
     build_flag_templates:
       - "--platform=linux/amd64"
+      - "--provenance=false"
     goos: linux
     goarch: amd64
     goamd64: v1
@@ -93,6 +94,7 @@ dockers:
     use: buildx
     build_flag_templates:
       - "--platform=linux/arm64"
+      - "--provenance=false"
     goos: linux
     goarch: arm64
     extra_files:
@@ -103,6 +105,10 @@ dockers:
 
 docker_manifests:
   - name_template: "cloudreve/cloudreve:latest"
+    image_templates:
+      - "cloudreve/cloudreve:{{ .Tag }}-amd64"
+      - "cloudreve/cloudreve:{{ .Tag }}-arm64"
+  - name_template: "cloudreve/cloudreve:v4"
     image_templates:
       - "cloudreve/cloudreve:{{ .Tag }}-amd64"
       - "cloudreve/cloudreve:{{ .Tag }}-arm64"

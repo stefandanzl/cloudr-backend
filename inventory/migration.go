@@ -12,8 +12,10 @@ import (
 	"github.com/cloudreve/Cloudreve/v4/ent"
 	"github.com/cloudreve/Cloudreve/v4/ent/group"
 	"github.com/cloudreve/Cloudreve/v4/ent/node"
+	"github.com/cloudreve/Cloudreve/v4/ent/oauthclient"
 	"github.com/cloudreve/Cloudreve/v4/ent/setting"
 	"github.com/cloudreve/Cloudreve/v4/ent/storagepolicy"
+	"github.com/cloudreve/Cloudreve/v4/inventory/debug"
 	"github.com/cloudreve/Cloudreve/v4/inventory/types"
 	"github.com/cloudreve/Cloudreve/v4/pkg/boolset"
 	"github.com/cloudreve/Cloudreve/v4/pkg/cache"
@@ -43,6 +45,10 @@ func migrate(l logging.Logger, client *ent.Client, ctx context.Context, kv cache
 
 	if err := migrateSysGroups(l, client, ctx); err != nil {
 		return fmt.Errorf("failed migrating default storage policy: %w", err)
+	}
+
+	if err := migrateOAuthClient(l, client, ctx); err != nil {
+		return fmt.Errorf("failed migrating OAuth client: %w", err)
 	}
 
 	if err := applyPatches(l, client, ctx, requiredDbVersion); err != nil {
@@ -269,6 +275,70 @@ func migrateMasterNode(l logging.Logger, client *ent.Client, ctx context.Context
 	return nil
 }
 
+const (
+	OAuthClientDesktopGUID        = "393a1839-f52e-498e-9972-e77cc2241eee"
+	OAuthClientDesktopSecret      = "8GaQIu3lOSdqYoDHi9cR8IZ4pvuMH8ya"
+	OAuthClientDesktopName        = "application:oauth.desktop"
+	OAuthClientDesktopRedirectURI = "/callback/desktop"
+	OAuthClientiOSGUID            = "220db97a-44a3-44f7-99b6-d767262b4daa"
+	OAuthClientiOSSecret          = "1kxOW4IyVOkPlsKCnTwzfHyP8XrbpfaF"
+	OAuthClientiOSName            = "application:setting.iOSApp"
+	OAuthClientiOSRedirectURI     = "/callback/ios"
+)
+
+func migrateOAuthClient(l logging.Logger, client *ent.Client, ctx context.Context) error {
+	if err := migrateOAuthClientDesktop(l, client, ctx); err != nil {
+		return err
+	}
+
+	if err := migrateOAuthClientiOS(l, client, ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func migrateOAuthClientiOS(l logging.Logger, client *ent.Client, ctx context.Context) error {
+	if _, err := client.OAuthClient.Query().Where(oauthclient.GUID(OAuthClientiOSGUID)).First(ctx); err == nil {
+		l.Info("Default OAuth client (GUID=%s) already exists, skip migrating.", OAuthClientiOSGUID)
+		return nil
+	}
+	if _, err := client.OAuthClient.Create().
+		SetGUID(OAuthClientiOSGUID).
+		SetSecret(OAuthClientiOSSecret).
+		SetName(OAuthClientiOSName).
+		SetRedirectUris([]string{OAuthClientiOSRedirectURI}).
+		SetScopes([]string{"profile", "email", "openid", "offline_access", "UserInfo.Write", "UserSecurityInfo.Write", "Workflow.Write", "Files.Write", "Shares.Write", "Finance.Write", "DavAccount.Write"}).
+		SetProps(&types.OAuthClientProps{Icon: "/static/img/cloudreve_ios.svg", RefreshTokenTTL: 7776000}).
+		SetIsEnabled(true).
+		Save(ctx); err != nil {
+		return fmt.Errorf("failed to create default OAuth client: %w", err)
+	}
+
+	return nil
+}
+
+func migrateOAuthClientDesktop(l logging.Logger, client *ent.Client, ctx context.Context) error {
+	if _, err := client.OAuthClient.Query().Where(oauthclient.GUID(OAuthClientDesktopGUID)).First(ctx); err == nil {
+		l.Info("Default OAuth client (GUID=%s) already exists, skip migrating.", OAuthClientDesktopGUID)
+		return nil
+	}
+
+	if _, err := client.OAuthClient.Create().
+		SetGUID(OAuthClientDesktopGUID).
+		SetSecret(OAuthClientDesktopSecret).
+		SetName(OAuthClientDesktopName).
+		SetRedirectUris([]string{OAuthClientDesktopRedirectURI}).
+		SetScopes([]string{"profile", "email", "openid", "offline_access", "UserInfo.Write", "Workflow.Write", "Files.Write", "Shares.Write"}).
+		SetProps(&types.OAuthClientProps{Icon: "/static/img/cloudreve.svg", RefreshTokenTTL: 7776000}).
+		SetIsEnabled(true).
+		Save(ctx); err != nil {
+		return fmt.Errorf("failed to create default OAuth client: %w", err)
+	}
+
+	return nil
+}
+
 type (
 	PatchFunc func(l logging.Logger, client *ent.Client, ctx context.Context) error
 	Patch     struct {
@@ -467,7 +537,7 @@ var patches = []Patch{
 			for i, t := range mailResetTemplate {
 				mailResetTemplate[i].Title = fmt.Sprintf("[{{ .CommonContext.SiteBasic.Name }}] %s", t.Title)
 			}
-			
+
 			newMailResetTemplate, err := json.Marshal(mailResetTemplate)
 			if err != nil {
 				return fmt.Errorf("failed to marshal mail_reset_template setting: %w", err)
@@ -492,6 +562,19 @@ var patches = []Patch{
 			newThumbSuffix := fmt.Sprintf("{blob_path}/{blob_name}%s", thumbSuffixSetting.Value)
 			if _, err := client.Setting.UpdateOne(thumbSuffixSetting).SetValue(newThumbSuffix).Save(ctx); err != nil {
 				return fmt.Errorf("failed to update thumb_entity_suffix setting: %w", err)
+			}
+
+			return nil
+		},
+	},
+	{
+		Name:       "reset_secret_key",
+		EndVersion: "4.13.0",
+		Func: func(l logging.Logger, client *ent.Client, ctx context.Context) error {
+			newSecretKey := util.RandStringRunesCrypto(256)
+			ctx = context.WithValue(ctx, debug.SkipDbLogging{}, true)
+			if err := client.Setting.Update().Where(setting.Name("secret_key")).SetValue(newSecretKey).Exec(ctx); err != nil {
+				return fmt.Errorf("failed to update secret_key setting: %w", err)
 			}
 
 			return nil

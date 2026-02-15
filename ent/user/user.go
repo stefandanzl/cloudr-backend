@@ -53,8 +53,12 @@ const (
 	EdgePasskey = "passkey"
 	// EdgeTasks holds the string denoting the tasks edge name in mutations.
 	EdgeTasks = "tasks"
+	// EdgeFsevents holds the string denoting the fsevents edge name in mutations.
+	EdgeFsevents = "fsevents"
 	// EdgeEntities holds the string denoting the entities edge name in mutations.
 	EdgeEntities = "entities"
+	// EdgeOauthGrants holds the string denoting the oauth_grants edge name in mutations.
+	EdgeOauthGrants = "oauth_grants"
 	// Table holds the table name of the user in the database.
 	Table = "users"
 	// GroupTable is the table that holds the group relation/edge.
@@ -99,6 +103,13 @@ const (
 	TasksInverseTable = "tasks"
 	// TasksColumn is the table column denoting the tasks relation/edge.
 	TasksColumn = "user_tasks"
+	// FseventsTable is the table that holds the fsevents relation/edge.
+	FseventsTable = "fs_events"
+	// FseventsInverseTable is the table name for the FsEvent entity.
+	// It exists in this package in order to avoid circular dependency with the "fsevent" package.
+	FseventsInverseTable = "fs_events"
+	// FseventsColumn is the table column denoting the fsevents relation/edge.
+	FseventsColumn = "user_fsevent"
 	// EntitiesTable is the table that holds the entities relation/edge.
 	EntitiesTable = "entities"
 	// EntitiesInverseTable is the table name for the Entity entity.
@@ -106,6 +117,13 @@ const (
 	EntitiesInverseTable = "entities"
 	// EntitiesColumn is the table column denoting the entities relation/edge.
 	EntitiesColumn = "created_by"
+	// OauthGrantsTable is the table that holds the oauth_grants relation/edge.
+	OauthGrantsTable = "oauth_grants"
+	// OauthGrantsInverseTable is the table name for the OAuthGrant entity.
+	// It exists in this package in order to avoid circular dependency with the "oauthgrant" package.
+	OauthGrantsInverseTable = "oauth_grants"
+	// OauthGrantsColumn is the table column denoting the oauth_grants relation/edge.
+	OauthGrantsColumn = "user_id"
 )
 
 // Columns holds all SQL columns for user fields.
@@ -327,6 +345,20 @@ func ByTasks(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByFseventsCount orders the results by fsevents count.
+func ByFseventsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newFseventsStep(), opts...)
+	}
+}
+
+// ByFsevents orders the results by fsevents terms.
+func ByFsevents(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newFseventsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByEntitiesCount orders the results by entities count.
 func ByEntitiesCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -338,6 +370,20 @@ func ByEntitiesCount(opts ...sql.OrderTermOption) OrderOption {
 func ByEntities(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	return func(s *sql.Selector) {
 		sqlgraph.OrderByNeighborTerms(s, newEntitiesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByOauthGrantsCount orders the results by oauth_grants count.
+func ByOauthGrantsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newOauthGrantsStep(), opts...)
+	}
+}
+
+// ByOauthGrants orders the results by oauth_grants terms.
+func ByOauthGrants(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newOauthGrantsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
 func newGroupStep() *sqlgraph.Step {
@@ -382,10 +428,24 @@ func newTasksStep() *sqlgraph.Step {
 		sqlgraph.Edge(sqlgraph.O2M, false, TasksTable, TasksColumn),
 	)
 }
+func newFseventsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(FseventsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, FseventsTable, FseventsColumn),
+	)
+}
 func newEntitiesStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(EntitiesInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, EntitiesTable, EntitiesColumn),
+	)
+}
+func newOauthGrantsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(OauthGrantsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, OauthGrantsTable, OauthGrantsColumn),
 	)
 }

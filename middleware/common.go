@@ -16,6 +16,7 @@ import (
 	"github.com/cloudreve/Cloudreve/v4/pkg/request"
 	"github.com/cloudreve/Cloudreve/v4/pkg/serializer"
 	"github.com/cloudreve/Cloudreve/v4/pkg/util"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/gofrs/uuid"
 )
@@ -103,6 +104,7 @@ func InitializeHandling(dep dependency.Dep) gin.HandlerFunc {
 			IP:        clientIp,
 			Host:      c.Request.Host,
 			UserAgent: c.Request.UserAgent(),
+			ClientID:  c.GetHeader(request.ClientIDHeader),
 		}
 		cid := uuid.FromStringOrNil(c.GetHeader(request.CorrelationHeader))
 		if cid == uuid.Nil {
@@ -155,4 +157,14 @@ func Logging() gin.HandlerFunc {
 		logging.Request(l, true, c.Writer.Status(), c.Request.Method, c.ClientIP(), path,
 			c.Errors.ByType(gin.ErrorTypePrivate).String(), start)
 	}
+}
+
+func ContentCORS() gin.HandlerFunc {
+	return cors.New(cors.Config{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "HEAD", "OPTIONS"},
+		AllowHeaders:     []string{"Range", "If-Range", "Authorization", "Content-Type"},
+		ExposeHeaders:    []string{"Content-Range", "Accept-Ranges", "Content-Length", "Content-Disposition", "Content-Disposition", "ETag"},
+		AllowCredentials: false,
+	})
 }

@@ -28,6 +28,12 @@ func (m *FileMutation) SetRawID(t int) {
 
 // SetUpdatedAt sets the "updated_at" field.
 
+func (m *FsEventMutation) SetRawID(t int) {
+	m.id = &t
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+
 func (m *GroupMutation) SetRawID(t int) {
 	m.id = &t
 }
@@ -41,6 +47,18 @@ func (m *MetadataMutation) SetRawID(t int) {
 // SetUpdatedAt sets the "updated_at" field.
 
 func (m *NodeMutation) SetRawID(t int) {
+	m.id = &t
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+
+func (m *OAuthClientMutation) SetRawID(t int) {
+	m.id = &t
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+
+func (m *OAuthGrantMutation) SetRawID(t int) {
 	m.id = &t
 }
 
